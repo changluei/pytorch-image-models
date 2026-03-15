@@ -8,11 +8,10 @@ from mmcv import print_log
 from mmcv.cnn import build_norm_layer
 from mmcv.cnn.utils.weight_init import constant_init, normal_init, trunc_normal_init
 from mmcv.runner import BaseModule, get_dist_info
-from timm.models.layers import DropPath
+from timm.layers import DropPath
 from torch.nn.modules.utils import _pair as to_2tuple
 
-from ..builder import ROTATED_BACKBONES
-from mmrotate.utils import get_root_logger
+from ._registry import register_model
 
 from mamba_ssm import Mamba
 
@@ -268,18 +267,33 @@ class StripSMambaNet(BaseModule):
         debug_backbone_stats=False,
         debug_backbone_interval=200,
         debug_backbone_log_first_n=10,
+        num_classes=0,
+        global_pool='avg',
+        pretrained_cfg=None,
+        pretrained_cfg_overlay=None,
+        cache_dir=None,
+        **kwargs,
     ):
         super().__init__(init_cfg=init_cfg)
 
-        assert not (init_cfg and pretrained), 'init_cfg and pretrained cannot be set at the same time'
+        assert not (init_cfg and isinstance(pretrained, str)), 'init_cfg and pretrained cannot be set at the same time'
         if isinstance(pretrained, str):
             warnings.warn('DeprecationWarning: pretrained is deprecated, please use "init_cfg" instead')
             self.init_cfg = dict(type='Pretrained', checkpoint=pretrained)
+        elif isinstance(pretrained, bool):
+            if pretrained:
+                warnings.warn(
+                    '`pretrained=True` is set, but no timm pretrained weights are registered for StripSMambaNet. '
+                    'Using random initialization.')
         elif pretrained is not None:
-            raise TypeError('pretrained must be a str or None')
+            raise TypeError('pretrained must be a bool, str, or None')
 
         self.depths = depths
         self.num_stages = num_stages
+        self.embed_dim = embed_dims[-1]
+        self.num_features = self.embed_dim
+        self.num_classes = num_classes
+        self.global_pool = global_pool
         self.debug_backbone_stats = debug_backbone_stats
         self.debug_backbone_interval = max(int(debug_backbone_interval), 1)
         self.debug_backbone_log_first_n = max(int(debug_backbone_log_first_n), 0)
@@ -319,6 +333,7 @@ class StripSMambaNet(BaseModule):
             setattr(self, f"patch_embed{i + 1}", patch_embed)
             setattr(self, f"block{i + 1}", block)
             setattr(self, f"norm{i + 1}", norm)
+        self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
 
     @staticmethod
     def _tensor_stats(x):
@@ -369,7 +384,17 @@ class StripSMambaNet(BaseModule):
 
     def reset_classifier(self, num_classes, global_pool=''):
         self.num_classes = num_classes
+        if global_pool:
+            self.global_pool = global_pool
         self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
+
+    def forward_head(self, x, pre_logits=False):
+        if isinstance(x, (list, tuple)):
+            x = x[-1]
+        x = x.mean(dim=(2, 3))
+        if pre_logits:
+            return x
+        return self.head(x)
 
     def forward_features(self, x):
         B = x.shape[0]
@@ -439,11 +464,13 @@ class StripSMambaNet(BaseModule):
                     f"{info['out_stats']['min']:.4f}/"
                     f"{info['out_stats']['max']:.4f}/"
                     f"{info['out_stats']['absmax']:.4f}",
-                    logger=get_root_logger())
+                    logger=None)
         return outs
 
     def forward(self, x):
         x = self.forward_features(x)
+        if self.num_classes > 0:
+            x = self.forward_head(x)
         return x
 
 
