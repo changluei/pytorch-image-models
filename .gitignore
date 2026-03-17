@@ -20,7 +20,7 @@ parts/
 sdist/
 var/
 wheels/
-imagenet/
+imagenet
 *.slurm
 *.egg-info/
 .installed.cfg
