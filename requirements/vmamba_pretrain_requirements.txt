@@ -7,12 +7,15 @@
 # - It is intentionally trimmed for the current StripNet ImageNet pretraining
 #   use case. VMamba/Mamba-only packages such as `selective-scan` are omitted.
 # - Install with a Python 3.10 conda env on a CUDA 12.1-compatible server.
+# - Conda compiler packages are intentionally omitted here because they are not
+#   available on every channel/mirror combination. On Linux, use the system
+#   `gcc/g++` if a source build needs them.
 # - `torch`, `torchvision`, and `torchaudio` are pinned to the CU121 wheels.
 # - `opencv-python-headless` is kept and `opencv-python` is intentionally
 #   omitted to avoid OpenCV package conflicts on servers.
 #
 # Suggested usage:
-#   conda create -n vmamba_pretrain python=3.10 pip gcc_linux-64=9.4.0 gxx_linux-64=9.4.0 -y
+#   conda create -n vmamba_pretrain python=3.10 pip -y
 #   conda activate vmamba_pretrain
 #   pip install -r requirements/vmamba_pretrain_requirements.txt
 
