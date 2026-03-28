@@ -4,16 +4,78 @@ from functools import partial
 
 import torch
 import torch.nn as nn
-from mmcv import print_log
-from mmcv.cnn import build_norm_layer
-from mmcv.cnn.utils.weight_init import constant_init, normal_init, trunc_normal_init
-from mmcv.runner import BaseModule, get_dist_info
 from timm.layers import DropPath
 from torch.nn.modules.utils import _pair as to_2tuple
 
 from ._registry import register_model
 
-from mamba_ssm import Mamba
+try:
+    from mamba_ssm import Mamba
+    _MAMBA_IMPORT_ERROR = None
+except ModuleNotFoundError as err:
+    Mamba = None
+    _MAMBA_IMPORT_ERROR = err
+
+
+def print_log(msg, logger=None):
+    del logger
+    print(msg)
+
+
+def build_norm_layer(cfg, num_features):
+    cfg = dict(cfg or {})
+    layer_type = cfg.pop('type', 'BN')
+    requires_grad = cfg.pop('requires_grad', True)
+
+    if layer_type in {'BN', 'BN2d', 'SyncBN'}:
+        layer = nn.BatchNorm2d(num_features, **cfg)
+    else:
+        raise ValueError(f'Unsupported norm layer type: {layer_type}')
+
+    for param in layer.parameters():
+        param.requires_grad = requires_grad
+
+    return layer_type.lower(), layer
+
+
+def constant_init(module, val, bias=0.):
+    if getattr(module, 'weight', None) is not None:
+        nn.init.constant_(module.weight, val)
+    if getattr(module, 'bias', None) is not None:
+        nn.init.constant_(module.bias, bias)
+
+
+def normal_init(module, mean=0., std=1., bias=0.):
+    if getattr(module, 'weight', None) is not None:
+        nn.init.normal_(module.weight, mean=mean, std=std)
+    if getattr(module, 'bias', None) is not None:
+        nn.init.constant_(module.bias, bias)
+
+
+def trunc_normal_init(module, mean=0., std=1., bias=0.):
+    if getattr(module, 'weight', None) is not None:
+        nn.init.trunc_normal_(module.weight, mean=mean, std=std)
+    if getattr(module, 'bias', None) is not None:
+        nn.init.constant_(module.bias, bias)
+
+
+def get_dist_info():
+    if torch.distributed.is_available() and torch.distributed.is_initialized():
+        return torch.distributed.get_rank(), torch.distributed.get_world_size()
+    return 0, 1
+
+
+class BaseModule(nn.Module):
+    def __init__(self, init_cfg=None):
+        super().__init__()
+        self.init_cfg = init_cfg
+
+    def init_weights(self):
+        if self.init_cfg is not None:
+            warnings.warn(
+                'init_cfg is ignored for StripSMambaNet without the OpenMMLab runtime.',
+                stacklevel=2,
+            )
 
 
 
@@ -41,6 +103,10 @@ class Mlp(nn.Module):
 class AxialCrossMambaUni(nn.Module):
     def __init__(self, dim, d_state=16, d_conv=4, expand=2):
         super().__init__()
+        if Mamba is None:
+            raise ImportError(
+                'stripnet_uni_cross_mamba requires the optional `mamba-ssm` dependency.'
+            ) from _MAMBA_IMPORT_ERROR
         self.row_mamba = Mamba(d_model=dim, d_state=d_state, d_conv=d_conv, expand=expand)
         self.col_mamba = Mamba(d_model=dim, d_state=d_state, d_conv=d_conv, expand=expand)
         self.diag_mamba = Mamba(d_model=dim, d_state=d_state, d_conv=d_conv, expand=expand)
@@ -354,7 +420,7 @@ class StripSMambaNet(BaseModule):
             # 1. collect all mamba module
             mamba_submodule_ids = set()
             for m in self.modules():
-                if isinstance(m, Mamba):
+                if Mamba is not None and isinstance(m, Mamba):
                     mamba_submodule_ids.update(id(sm) for sm in m.modules())
             
             for m in self.modules():
