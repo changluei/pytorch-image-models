@@ -1,0 +1,98 @@
+# VMamba/timm pretraining environment converted from `vmamba.txt`.
+# Target: Linux + CUDA 12.1 + Python 3.10
+#
+# Notes:
+# - This file is for the pretraining environment, not the legacy Strip-R-CNN
+#   finetuning environment in this repo.
+# - It is intentionally trimmed for the current StripNet ImageNet pretraining
+#   use case. VMamba/Mamba-only packages such as `selective-scan` are omitted.
+# - Install with a Python 3.10 conda env on a CUDA 12.1-compatible server.
+# - `torch`, `torchvision`, and `torchaudio` are pinned to the CU121 wheels.
+# - `opencv-python-headless` is kept and `opencv-python` is intentionally
+#   omitted to avoid OpenCV package conflicts on servers.
+#
+# Suggested usage:
+#   conda create -n vmamba_pretrain python=3.10 pip gcc_linux-64=9.4.0 gxx_linux-64=9.4.0 -y
+#   conda activate vmamba_pretrain
+#   pip install -r requirements/vmamba_pretrain_requirements.txt
+
+--extra-index-url https://download.pytorch.org/whl/cu121
+
+torch==2.4.1+cu121
+torchvision==0.19.1+cu121
+torchaudio==2.4.1+cu121
+
+addict==2.4.0
+chardet==5.2.0
+click==8.2.1
+cloudpickle==3.1.1
+contourpy==1.3.2
+cycler==0.12.1
+einops==0.8.1
+exceptiongroup==1.3.0
+filelock==3.13.1
+fonttools==4.58.4
+fsspec==2024.6.1
+ftfy==6.3.1
+fvcore==0.1.5.post20221221
+importlib-metadata==8.7.0
+iniconfig==2.1.0
+iopath==0.1.10
+jinja2==3.1.4
+kiwisolver==1.4.8
+markdown==3.8.2
+markdown-it-py==3.0.0
+markupsafe==2.1.5
+mat4py==0.6.0
+matplotlib==3.10.3
+mdurl==0.1.2
+mmcv==2.1.0
+mmdet==3.3.0
+mmengine==0.10.1
+mmpretrain==1.2.0
+mmsegmentation==1.2.2
+model-index==0.1.11
+modelindex==0.0.2
+mpmath==1.3.0
+networkx==3.3
+ninja==1.11.1.4
+numpy==2.1.2
+opencv-python-headless==4.11.0.86
+ordered-set==4.1.0
+packaging==25.0
+pandas==2.3.0
+pillow==11.0.0
+platformdirs==4.3.8
+pluggy==1.6.0
+portalocker==3.2.0
+prettytable==3.16.0
+protobuf==6.31.1
+pycocotools==2.0.10
+pygments==2.19.2
+pyparsing==3.2.3
+pytest==8.4.1
+python-dateutil==2.9.0.post0
+pytz==2025.2
+pyyaml==6.0.2
+regex==2024.11.6
+rich==14.0.0
+scipy==1.15.3
+seaborn==0.13.2
+shapely==2.1.1
+six==1.17.0
+submitit==1.5.3
+sympy==1.13.3
+tabulate==0.9.0
+tensorboardx==2.6.4
+termcolor==3.1.0
+terminaltables==3.1.10
+timm==0.4.12
+tomli==2.2.1
+tqdm==4.67.1
+triton==3.0.0
+typing-extensions==4.12.2
+tzdata==2025.2
+wcwidth==0.2.13
+yacs==0.1.8
+yapf==0.43.0
+zipp==3.23.0
